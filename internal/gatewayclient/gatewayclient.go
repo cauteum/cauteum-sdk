@@ -540,6 +540,7 @@ type Proposal struct {
 	Hosts            []string  `json:"hosts,omitempty"`
 	RejectionReason  string    `json:"rejection_reason,omitempty"`
 	ValidationResult string    `json:"validation_result,omitempty"`
+	SecurityFlagged  bool      `json:"security_flagged,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	DecidedAt        time.Time `json:"decided_at,omitempty"`
 }
