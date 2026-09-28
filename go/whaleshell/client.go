@@ -49,15 +49,16 @@ func NewWithToken(base, token string) *Client {
 
 // Stable type aliases (gateway HTTP payloads).
 type (
-	Sandbox        = gc.Sandbox
-	ExecResult     = gc.ExecResult
-	LogLine        = gc.LogLine
-	Proposal       = gc.Proposal
-	ProviderRecord = gc.ProviderRecord
-	InferenceRoute = gc.InferenceRoute
-	ServiceRecord  = gc.ServiceRecord
-	SSHSession     = gc.SSHSession
-	SSHSessionInfo = gc.SSHSessionInfo
+	Sandbox               = gc.Sandbox
+	ExecResult            = gc.ExecResult
+	LogLine               = gc.LogLine
+	Proposal              = gc.Proposal
+	ProviderRecord        = gc.ProviderRecord
+	ProviderRefreshConfig = gc.ProviderRefreshConfig
+	InferenceRoute        = gc.InferenceRoute
+	ServiceRecord         = gc.ServiceRecord
+	SSHSession            = gc.SSHSession
+	SSHSessionInfo        = gc.SSHSessionInfo
 )
 
 // Create registers (upserts) a sandbox in the gateway registry.

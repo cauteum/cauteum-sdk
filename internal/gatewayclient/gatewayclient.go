@@ -85,6 +85,7 @@ type Sandbox struct {
 	Name              string            `json:"name"`
 	ID                string            `json:"id,omitempty"`
 	Image             string            `json:"image,omitempty"`
+	Workspace         string            `json:"workspace,omitempty"`
 	Network           string            `json:"network,omitempty"`
 	Status            string            `json:"status,omitempty"`
 	Labels            map[string]string `json:"labels,omitempty"`
@@ -183,28 +184,91 @@ func (c *Client) PutGlobalPolicy(ctx context.Context, yaml []byte) error {
 
 // ProfileInfo is a catalog entry summary.
 type ProfileInfo struct {
-	ID     string `json:"id"`
-	Source string `json:"source"`
+	ID       string `json:"id"`
+	Category string `json:"category,omitempty"`
+	Source   string `json:"source"`
+	Scope    string `json:"scope,omitempty"`
 }
 
 // ListProfiles GET /v1/profiles.
 func (c *Client) ListProfiles(ctx context.Context) ([]ProfileInfo, error) {
+	return c.ListProfilesScoped(ctx, "global", "")
+}
+
+func (c *Client) ListProfilesScoped(ctx context.Context, scope, workspace string) ([]ProfileInfo, error) {
 	var out struct {
 		Profiles []ProfileInfo `json:"profiles"`
 	}
-	if err := c.get(ctx, "/v1/profiles", &out); err != nil {
+	if err := c.get(ctx, profileScopePath("/v1/profiles", scope, workspace), &out); err != nil {
 		return nil, err
 	}
 	return out.Profiles, nil
 }
 
+// GetProfile fetches a profile from the selected gateway. JSON is valid YAML,
+// so returning the original JSON document also keeps the SDK schema-agnostic.
+func (c *Client) GetProfile(ctx context.Context, id string) ([]byte, string, string, error) {
+	return c.GetProfileScoped(ctx, id, "global", "")
+}
+
+func (c *Client) GetProfileScoped(ctx context.Context, id, scope, workspace string) ([]byte, string, string, error) {
+	path := profileScopePath("/v1/profiles/"+url.PathEscape(id), scope, workspace)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+path, nil)
+	if err != nil {
+		return nil, "", "", err
+	}
+	c.auth(req)
+	res, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, "", "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= 300 {
+		body, _ := io.ReadAll(res.Body)
+		return nil, "", "", fmt.Errorf("gateway get profile: %s: %s", res.Status, bytes.TrimSpace(body))
+	}
+	var out struct {
+		Profile json.RawMessage `json:"profile"`
+		Source  string          `json:"source"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		return nil, "", "", err
+	}
+	return out.Profile, out.Source, strings.Trim(res.Header.Get("ETag"), `"`), nil
+}
+
+// CreateProfile imports a profile without replacing an existing catalog entry.
+func (c *Client) CreateProfile(ctx context.Context, id string, profile []byte) error {
+	return c.CreateProfileScoped(ctx, id, profile, "global", "")
+}
+
+func (c *Client) CreateProfileScoped(ctx context.Context, id string, profile []byte, scope, workspace string) error {
+	return c.writeProfile(ctx, http.MethodPost, id, profile, "create", scope, workspace)
+}
+
 // PutProfile PUT /v1/profiles/{id} with YAML body.
-func (c *Client) PutProfile(ctx context.Context, id string, yaml []byte) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/profiles/"+id, bytes.NewReader(yaml))
+func (c *Client) PutProfile(ctx context.Context, id string, yaml []byte, expectedVersion string) error {
+	return c.PutProfileScoped(ctx, id, yaml, expectedVersion, "global", "")
+}
+
+func (c *Client) PutProfileScoped(ctx context.Context, id string, yaml []byte, expectedVersion, scope, workspace string) error {
+	if expectedVersion == "" {
+		return fmt.Errorf("gateway profile update: resource version required; read the profile first")
+	}
+	return c.writeProfile(ctx, http.MethodPut, id, yaml, "update", scope, workspace, expectedVersion)
+}
+
+func (c *Client) writeProfile(ctx context.Context, method, id string, profile []byte, operation, scope, workspace string, expectedVersion ...string) error {
+	path := profileScopePath("/v1/profiles/"+url.PathEscape(id), scope, workspace)
+	req, err := http.NewRequestWithContext(ctx, method, c.Base+path, bytes.NewReader(profile))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/yaml")
+	c.auth(req)
+	if len(expectedVersion) > 0 && expectedVersion[0] != "" {
+		req.Header.Set("If-Match", `"`+expectedVersion[0]+`"`)
+	}
 	res, err := c.HTTP.Do(req)
 	if err != nil {
 		return err
@@ -212,20 +276,47 @@ func (c *Client) PutProfile(ctx context.Context, id string, yaml []byte) error {
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
 		body, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("gateway put profile: %s: %s", res.Status, bytes.TrimSpace(body))
+		return fmt.Errorf("gateway profile %s: %s: %s", operation, res.Status, bytes.TrimSpace(body))
 	}
 	return nil
 }
 
+func profileScopePath(path, scope, workspace string) string {
+	values := url.Values{}
+	if scope == "" {
+		scope = "global"
+	}
+	values.Set("scope", scope)
+	if workspace != "" {
+		values.Set("workspace", workspace)
+	}
+	return path + "?" + values.Encode()
+}
+
 // ProviderRecord is a gateway provider instance (env key names only on GET).
 type ProviderRecord struct {
-	Name                  string            `json:"name"`
-	Type                  string            `json:"type"`
-	EnvVars               []string          `json:"env_vars,omitempty"`
-	Credentials           map[string]string `json:"credentials,omitempty"` // write-only on PUT
-	CredentialExpiresAtMS map[string]int64  `json:"credential_expires_at_ms,omitempty"`
-	RuntimeCredentials    bool              `json:"runtime_credentials,omitempty"`
-	Config                map[string]string `json:"config,omitempty"`
+	Name                  string                           `json:"name"`
+	Type                  string                           `json:"type"`
+	Workspace             string                           `json:"workspace,omitempty"`
+	EnvVars               []string                         `json:"env_vars,omitempty"`
+	Credentials           map[string]string                `json:"credentials,omitempty"` // write-only on PUT
+	CredentialExpiresAtMS map[string]int64                 `json:"credential_expires_at_ms,omitempty"`
+	RuntimeCredentials    bool                             `json:"runtime_credentials,omitempty"`
+	Config                map[string]string                `json:"config,omitempty"`
+	Refresh               map[string]ProviderRefreshConfig `json:"refresh,omitempty"`
+}
+
+// ProviderRefreshConfig is gateway-side credential rotation metadata.
+type ProviderRefreshConfig struct {
+	CredentialKey          string            `json:"credential_key"`
+	Strategy               string            `json:"strategy"`
+	Material               map[string]string `json:"material,omitempty"`
+	MaterialSecretKeys     []string          `json:"material_secret_keys,omitempty"`
+	MaterialCredentialKeys map[string]string `json:"material_credential_keys,omitempty"`
+	Outputs                map[string]string `json:"outputs,omitempty"`
+	RefreshBeforeSeconds   int64             `json:"refresh_before_seconds,omitempty"`
+	MaxLifetimeSeconds     int64             `json:"max_lifetime_seconds,omitempty"`
+	ExpiresAtMS            int64             `json:"expires_at_ms,omitempty"`
 }
 
 // PutProvider PUT /v1/providers/{name}. Credentials values are stored encrypted on the gateway.
@@ -292,10 +383,16 @@ func (c *Client) DeleteProvider(ctx context.Context, name string) error {
 
 // DeleteProfile DELETE /v1/profiles/{id}.
 func (c *Client) DeleteProfile(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/profiles/"+id, nil)
+	return c.DeleteProfileScoped(ctx, id, "global", "")
+}
+
+func (c *Client) DeleteProfileScoped(ctx context.Context, id, scope, workspace string) error {
+	path := profileScopePath("/v1/profiles/"+url.PathEscape(id), scope, workspace)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+path, nil)
 	if err != nil {
 		return err
 	}
+	c.auth(req)
 	res, err := c.HTTP.Do(req)
 	if err != nil {
 		return err
