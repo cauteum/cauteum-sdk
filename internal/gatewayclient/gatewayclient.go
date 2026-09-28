@@ -295,14 +295,28 @@ func profileScopePath(path, scope, workspace string) string {
 
 // ProviderRecord is a gateway provider instance (env key names only on GET).
 type ProviderRecord struct {
-	Name                  string            `json:"name"`
-	Type                  string            `json:"type"`
-	Workspace             string            `json:"workspace,omitempty"`
-	EnvVars               []string          `json:"env_vars,omitempty"`
-	Credentials           map[string]string `json:"credentials,omitempty"` // write-only on PUT
-	CredentialExpiresAtMS map[string]int64  `json:"credential_expires_at_ms,omitempty"`
-	RuntimeCredentials    bool              `json:"runtime_credentials,omitempty"`
-	Config                map[string]string `json:"config,omitempty"`
+	Name                  string                           `json:"name"`
+	Type                  string                           `json:"type"`
+	Workspace             string                           `json:"workspace,omitempty"`
+	EnvVars               []string                         `json:"env_vars,omitempty"`
+	Credentials           map[string]string                `json:"credentials,omitempty"` // write-only on PUT
+	CredentialExpiresAtMS map[string]int64                 `json:"credential_expires_at_ms,omitempty"`
+	RuntimeCredentials    bool                             `json:"runtime_credentials,omitempty"`
+	Config                map[string]string                `json:"config,omitempty"`
+	Refresh               map[string]ProviderRefreshConfig `json:"refresh,omitempty"`
+}
+
+// ProviderRefreshConfig is gateway-side credential rotation metadata.
+type ProviderRefreshConfig struct {
+	CredentialKey          string            `json:"credential_key"`
+	Strategy               string            `json:"strategy"`
+	Material               map[string]string `json:"material,omitempty"`
+	MaterialSecretKeys     []string          `json:"material_secret_keys,omitempty"`
+	MaterialCredentialKeys map[string]string `json:"material_credential_keys,omitempty"`
+	Outputs                map[string]string `json:"outputs,omitempty"`
+	RefreshBeforeSeconds   int64             `json:"refresh_before_seconds,omitempty"`
+	MaxLifetimeSeconds     int64             `json:"max_lifetime_seconds,omitempty"`
+	ExpiresAtMS            int64             `json:"expires_at_ms,omitempty"`
 }
 
 // PutProvider PUT /v1/providers/{name}. Credentials values are stored encrypted on the gateway.
