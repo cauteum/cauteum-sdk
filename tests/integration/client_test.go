@@ -1,4 +1,4 @@
-package whaleshell_test
+package integration
 
 import (
 	"context"

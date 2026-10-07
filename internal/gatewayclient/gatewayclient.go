@@ -14,6 +14,30 @@ import (
 	"time"
 )
 
+// RequestTimeout bounds ordinary gateway requests; RelayTimeout allows relay execution.
+const (
+	RequestTimeout = 10 * time.Second
+	RelayTimeout   = 70 * time.Second
+)
+
+// Labels maps metadata names to their values.
+type Labels = map[string]string
+
+// Credentials maps credential environment keys to secret values.
+type Credentials = map[string]string
+
+// ProviderConfig maps provider option names to their values.
+type ProviderConfig = map[string]string
+
+// RefreshMaterial maps refresh input names to their values.
+type RefreshMaterial = map[string]string
+
+// CredentialBindings maps refresh inputs or outputs to credential keys.
+type CredentialBindings = map[string]string
+
+// CredentialExpiry maps credential keys to Unix millisecond expiration times.
+type CredentialExpiry = map[string]int64
+
 // Client is a tiny HTTP client for whaleshell-gateway.
 type Client struct {
 	Base  string
@@ -26,7 +50,7 @@ type Client struct {
 // NewWithToken) — it is attached to every request by the transport.
 func New(base string) *Client {
 	c := &Client{Base: strings.TrimRight(base, "/")}
-	c.HTTP = &http.Client{Timeout: 10 * time.Second, Transport: &authTransport{c: c}}
+	c.HTTP = &http.Client{Timeout: RequestTimeout, Transport: &authTransport{c: c}}
 	return c
 }
 
@@ -82,15 +106,15 @@ func (c *Client) Info(ctx context.Context) (map[string]any, error) {
 
 // Sandbox is the registry payload.
 type Sandbox struct {
-	Name              string            `json:"name"`
-	ID                string            `json:"id,omitempty"`
-	Image             string            `json:"image,omitempty"`
-	Workspace         string            `json:"workspace,omitempty"`
-	Network           string            `json:"network,omitempty"`
-	Status            string            `json:"status,omitempty"`
-	Labels            map[string]string `json:"labels,omitempty"`
-	BasePolicyYAML    string            `json:"base_policy_yaml,omitempty"`
-	AttachedProviders []string          `json:"attached_providers,omitempty"`
+	Name              string   `json:"name"`
+	ID                string   `json:"id,omitempty"`
+	Image             string   `json:"image,omitempty"`
+	Workspace         string   `json:"workspace,omitempty"`
+	Network           string   `json:"network,omitempty"`
+	Status            string   `json:"status,omitempty"`
+	Labels            Labels   `json:"labels,omitempty"`
+	BasePolicyYAML    string   `json:"base_policy_yaml,omitempty"`
+	AttachedProviders []string `json:"attached_providers,omitempty"`
 }
 
 // UpsertSandbox PUT /v1/sandboxes/{name}.
@@ -99,7 +123,7 @@ func (c *Client) UpsertSandbox(ctx context.Context, sb Sandbox) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/sandboxes/"+sb.Name, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/sandboxes/"+url.PathEscape(sb.Name), bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -110,7 +134,11 @@ func (c *Client) UpsertSandbox(ctx context.Context, sb Sandbox) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway upsert: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -118,7 +146,7 @@ func (c *Client) UpsertSandbox(ctx context.Context, sb Sandbox) error {
 
 // DeleteSandbox DELETE /v1/sandboxes/{name}.
 func (c *Client) DeleteSandbox(ctx context.Context, name string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/sandboxes/"+name, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/sandboxes/"+url.PathEscape(name), nil)
 	if err != nil {
 		return err
 	}
@@ -128,7 +156,11 @@ func (c *Client) DeleteSandbox(ctx context.Context, name string) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 && res.StatusCode != http.StatusNotFound {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway delete: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -156,7 +188,11 @@ func (c *Client) GetGlobalPolicy(ctx context.Context) ([]byte, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return nil, err
+	}
 	if res.StatusCode >= 300 {
 		return nil, fmt.Errorf("gateway global policy: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
@@ -176,7 +212,11 @@ func (c *Client) PutGlobalPolicy(ctx context.Context, yaml []byte) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway put global policy: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -224,7 +264,11 @@ func (c *Client) GetProfileScoped(ctx context.Context, id, scope, workspace stri
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return nil, "", "", err
+		}
 		return nil, "", "", fmt.Errorf("gateway get profile: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	var out struct {
@@ -275,7 +319,11 @@ func (c *Client) writeProfile(ctx context.Context, method, id string, profile []
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway profile %s: %s: %s", operation, res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -299,24 +347,24 @@ type ProviderRecord struct {
 	Type                  string                           `json:"type"`
 	Workspace             string                           `json:"workspace,omitempty"`
 	EnvVars               []string                         `json:"env_vars,omitempty"`
-	Credentials           map[string]string                `json:"credentials,omitempty"` // write-only on PUT
-	CredentialExpiresAtMS map[string]int64                 `json:"credential_expires_at_ms,omitempty"`
+	Credentials           Credentials                      `json:"credentials,omitempty"` // write-only on PUT
+	CredentialExpiresAtMS CredentialExpiry                 `json:"credential_expires_at_ms,omitempty"`
 	RuntimeCredentials    bool                             `json:"runtime_credentials,omitempty"`
-	Config                map[string]string                `json:"config,omitempty"`
+	Config                ProviderConfig                   `json:"config,omitempty"`
 	Refresh               map[string]ProviderRefreshConfig `json:"refresh,omitempty"`
 }
 
 // ProviderRefreshConfig is gateway-side credential rotation metadata.
 type ProviderRefreshConfig struct {
-	CredentialKey          string            `json:"credential_key"`
-	Strategy               string            `json:"strategy"`
-	Material               map[string]string `json:"material,omitempty"`
-	MaterialSecretKeys     []string          `json:"material_secret_keys,omitempty"`
-	MaterialCredentialKeys map[string]string `json:"material_credential_keys,omitempty"`
-	Outputs                map[string]string `json:"outputs,omitempty"`
-	RefreshBeforeSeconds   int64             `json:"refresh_before_seconds,omitempty"`
-	MaxLifetimeSeconds     int64             `json:"max_lifetime_seconds,omitempty"`
-	ExpiresAtMS            int64             `json:"expires_at_ms,omitempty"`
+	CredentialKey          string             `json:"credential_key"`
+	Strategy               string             `json:"strategy"`
+	Material               RefreshMaterial    `json:"material,omitempty"`
+	MaterialSecretKeys     []string           `json:"material_secret_keys,omitempty"`
+	MaterialCredentialKeys CredentialBindings `json:"material_credential_keys,omitempty"`
+	Outputs                CredentialBindings `json:"outputs,omitempty"`
+	RefreshBeforeSeconds   int64              `json:"refresh_before_seconds,omitempty"`
+	MaxLifetimeSeconds     int64              `json:"max_lifetime_seconds,omitempty"`
+	ExpiresAtMS            int64              `json:"expires_at_ms,omitempty"`
 }
 
 // PutProvider PUT /v1/providers/{name}. Credentials values are stored encrypted on the gateway.
@@ -325,7 +373,7 @@ func (c *Client) PutProvider(ctx context.Context, rec ProviderRecord) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/providers/"+rec.Name, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/providers/"+url.PathEscape(rec.Name), bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -337,7 +385,11 @@ func (c *Client) PutProvider(ctx context.Context, rec ProviderRecord) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway put provider: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -357,7 +409,7 @@ func (c *Client) ListProviders(ctx context.Context) ([]ProviderRecord, error) {
 // GetProvider GET /v1/providers/{name} (metadata only; no secret values).
 func (c *Client) GetProvider(ctx context.Context, name string) (ProviderRecord, error) {
 	var out ProviderRecord
-	if err := c.get(ctx, "/v1/providers/"+name, &out); err != nil {
+	if err := c.get(ctx, "/v1/providers/"+url.PathEscape(name), &out); err != nil {
 		return ProviderRecord{}, err
 	}
 	return out, nil
@@ -365,7 +417,7 @@ func (c *Client) GetProvider(ctx context.Context, name string) (ProviderRecord, 
 
 // DeleteProvider DELETE /v1/providers/{name}.
 func (c *Client) DeleteProvider(ctx context.Context, name string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/providers/"+name, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/providers/"+url.PathEscape(name), nil)
 	if err != nil {
 		return err
 	}
@@ -375,7 +427,11 @@ func (c *Client) DeleteProvider(ctx context.Context, name string) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway delete provider: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -399,7 +455,11 @@ func (c *Client) DeleteProfileScoped(ctx context.Context, id, scope, workspace s
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway delete profile: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -407,7 +467,7 @@ func (c *Client) DeleteProfileScoped(ctx context.Context, id, scope, workspace s
 
 // AttachProvider PUT /v1/sandboxes/{sandbox}/providers/{provider}.
 func (c *Client) AttachProvider(ctx context.Context, sandbox, provider string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/sandboxes/"+sandbox+"/providers/"+provider, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/providers/"+url.PathEscape(provider), nil)
 	if err != nil {
 		return err
 	}
@@ -417,7 +477,11 @@ func (c *Client) AttachProvider(ctx context.Context, sandbox, provider string) e
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway attach provider: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -425,7 +489,7 @@ func (c *Client) AttachProvider(ctx context.Context, sandbox, provider string) e
 
 // DetachProvider DELETE /v1/sandboxes/{sandbox}/providers/{provider}.
 func (c *Client) DetachProvider(ctx context.Context, sandbox, provider string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/sandboxes/"+sandbox+"/providers/"+provider, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/providers/"+url.PathEscape(provider), nil)
 	if err != nil {
 		return err
 	}
@@ -435,7 +499,11 @@ func (c *Client) DetachProvider(ctx context.Context, sandbox, provider string) e
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway detach provider: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -458,7 +526,7 @@ func (c *Client) GetSandboxPolicy(ctx context.Context, sandbox, view string) ([]
 	default:
 		return nil, fmt.Errorf("policy view must be base or full")
 	}
-	u := c.Base + "/v1/sandboxes/" + sandbox + "/policy?view=" + view
+	u := c.Base + "/v1/sandboxes/" + url.PathEscape(sandbox) + "/policy?view=" + view
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
@@ -468,11 +536,15 @@ func (c *Client) GetSandboxPolicy(ctx context.Context, sandbox, view string) ([]
 		return nil, err
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return nil, err
+	}
 	if res.StatusCode >= 300 {
 		// Older gateways only expose effective-policy.
 		if view == "full" {
-			req2, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+"/v1/sandboxes/"+sandbox+"/effective-policy", nil)
+			req2, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/effective-policy", nil)
 			if err != nil {
 				return nil, err
 			}
@@ -481,7 +553,11 @@ func (c *Client) GetSandboxPolicy(ctx context.Context, sandbox, view string) ([]
 				return nil, err
 			}
 			defer res2.Body.Close()
-			body2, _ := io.ReadAll(res2.Body)
+			body2, err := io.ReadAll(res2.Body)
+			if err != nil {
+				err = fmt.Errorf("gateway read response body: %w", err)
+				return nil, err
+			}
 			if res2.StatusCode >= 300 {
 				return nil, fmt.Errorf("gateway policy get: %s: %s", res.Status, bytes.TrimSpace(body))
 			}
@@ -495,7 +571,7 @@ func (c *Client) GetSandboxPolicy(ctx context.Context, sandbox, view string) ([]
 // PutSandboxPolicy PUT /v1/sandboxes/{name}/policy — stores base YAML, returns effective YAML.
 // OpenShell-style: providers stay attached; gateway re-composes before accepting.
 func (c *Client) PutSandboxPolicy(ctx context.Context, sandbox string, baseYAML []byte) (effective []byte, stripped int, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/sandboxes/"+sandbox+"/policy", bytes.NewReader(baseYAML))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/policy", bytes.NewReader(baseYAML))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -505,7 +581,11 @@ func (c *Client) PutSandboxPolicy(ctx context.Context, sandbox string, baseYAML 
 		return nil, 0, err
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return nil, 0, err
+	}
 	if res.StatusCode >= 300 {
 		return nil, 0, fmt.Errorf("gateway policy set: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
@@ -528,7 +608,7 @@ func (c *Client) ListPolicyRevisions(ctx context.Context, sandbox string) ([]Pol
 	var out struct {
 		Revisions []PolicyRevisionMeta `json:"revisions"`
 	}
-	if err := c.get(ctx, "/v1/sandboxes/"+sandbox+"/policy-revisions", &out); err != nil {
+	if err := c.get(ctx, "/v1/sandboxes/"+url.PathEscape(sandbox)+"/policy-revisions", &out); err != nil {
 		return nil, err
 	}
 	return out.Revisions, nil
@@ -537,7 +617,7 @@ func (c *Client) ListPolicyRevisions(ctx context.Context, sandbox string) ([]Pol
 // GetPolicyRevision GET /v1/sandboxes/{name}/policy-revisions?rev=N (YAML body).
 func (c *Client) GetPolicyRevision(ctx context.Context, sandbox string, rev int) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		fmt.Sprintf("%s/v1/sandboxes/%s/policy-revisions?rev=%d", c.Base, sandbox, rev), nil)
+		fmt.Sprintf("%s/v1/sandboxes/%s/policy-revisions?rev=%d", c.Base, url.PathEscape(sandbox), rev), nil)
 	if err != nil {
 		return "", err
 	}
@@ -546,7 +626,11 @@ func (c *Client) GetPolicyRevision(ctx context.Context, sandbox string, rev int)
 		return "", err
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return "", err
+	}
 	if res.StatusCode >= 300 {
 		return "", fmt.Errorf("gateway policy rev: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
@@ -565,7 +649,7 @@ func (c *Client) ListSandboxProviders(ctx context.Context, sandbox string) ([]Sa
 	var out struct {
 		Providers []SandboxProviderAttachment `json:"providers"`
 	}
-	if err := c.get(ctx, "/v1/sandboxes/"+sandbox+"/providers", &out); err != nil {
+	if err := c.get(ctx, "/v1/sandboxes/"+url.PathEscape(sandbox)+"/providers", &out); err != nil {
 		return nil, err
 	}
 	return out.Providers, nil
@@ -583,7 +667,11 @@ func (c *Client) get(ctx context.Context, path string, dest any) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway %s: %s: %s", path, res.Status, bytes.TrimSpace(body))
 	}
 	return json.NewDecoder(res.Body).Decode(dest)
@@ -594,7 +682,7 @@ func (c *Client) ResolveSecrets(ctx context.Context, sandbox string) (map[string
 	var out struct {
 		Secrets map[string]string `json:"secrets"`
 	}
-	if err := c.get(ctx, "/v1/sandboxes/"+sandbox+"/secrets", &out); err != nil {
+	if err := c.get(ctx, "/v1/sandboxes/"+url.PathEscape(sandbox)+"/secrets", &out); err != nil {
 		return nil, err
 	}
 	if out.Secrets == nil {
@@ -609,7 +697,7 @@ func (c *Client) PostLogs(ctx context.Context, sandbox string, lines []LogLine) 
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/v1/sandboxes/"+sandbox+"/logs", bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/logs", bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -620,7 +708,11 @@ func (c *Client) PostLogs(ctx context.Context, sandbox string, lines []LogLine) 
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway post logs: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -639,12 +731,12 @@ type Proposal struct {
 	ValidationResult string    `json:"validation_result,omitempty"`
 	SecurityFlagged  bool      `json:"security_flagged,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
-	DecidedAt        time.Time `json:"decided_at,omitempty"`
+	DecidedAt        time.Time `json:"decided_at"`
 }
 
 // ListProposals GET /v1/sandboxes/{name}/proposals.
 func (c *Client) ListProposals(ctx context.Context, sandbox, status string) ([]Proposal, error) {
-	path := "/v1/sandboxes/" + sandbox + "/proposals"
+	path := "/v1/sandboxes/" + url.PathEscape(sandbox) + "/proposals"
 	if status != "" {
 		path += "?status=" + url.QueryEscape(status)
 	}
@@ -659,7 +751,7 @@ func (c *Client) ListProposals(ctx context.Context, sandbox, status string) ([]P
 
 // GetProposal GET /v1/sandboxes/{name}/proposals/{id}.
 func (c *Client) GetProposal(ctx context.Context, sandbox, id string) (Proposal, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+"/v1/sandboxes/"+sandbox+"/proposals/"+id, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/proposals/"+url.PathEscape(id), nil)
 	if err != nil {
 		return Proposal{}, err
 	}
@@ -669,7 +761,11 @@ func (c *Client) GetProposal(ctx context.Context, sandbox, id string) (Proposal,
 		return Proposal{}, err
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return Proposal{}, err
+	}
 	if res.StatusCode >= 300 {
 		return Proposal{}, fmt.Errorf("get proposal: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
@@ -682,7 +778,7 @@ func (c *Client) GetProposal(ctx context.Context, sandbox, id string) (Proposal,
 
 // ApproveProposal POST /v1/sandboxes/{name}/proposals/{id}/approve — merges rule into base.
 func (c *Client) ApproveProposal(ctx context.Context, sandbox, id string) (Proposal, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/v1/sandboxes/"+sandbox+"/proposals/"+id+"/approve", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/proposals/"+url.PathEscape(id)+"/approve", nil)
 	if err != nil {
 		return Proposal{}, err
 	}
@@ -692,7 +788,11 @@ func (c *Client) ApproveProposal(ctx context.Context, sandbox, id string) (Propo
 		return Proposal{}, err
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return Proposal{}, err
+	}
 	if res.StatusCode >= 300 {
 		return Proposal{}, fmt.Errorf("approve proposal: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
@@ -705,8 +805,12 @@ func (c *Client) ApproveProposal(ctx context.Context, sandbox, id string) (Propo
 
 // RejectProposal POST /v1/sandboxes/{name}/proposals/{id}/reject.
 func (c *Client) RejectProposal(ctx context.Context, sandbox, id, reason string) (Proposal, error) {
-	b, _ := json.Marshal(map[string]string{"reason": reason})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/v1/sandboxes/"+sandbox+"/proposals/"+id+"/reject", bytes.NewReader(b))
+	b, err := json.Marshal(map[string]string{"reason": reason})
+	if err != nil {
+		err = fmt.Errorf("gateway encode request: %w", err)
+		return Proposal{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/proposals/"+url.PathEscape(id)+"/reject", bytes.NewReader(b))
 	if err != nil {
 		return Proposal{}, err
 	}
@@ -717,7 +821,11 @@ func (c *Client) RejectProposal(ctx context.Context, sandbox, id, reason string)
 		return Proposal{}, err
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return Proposal{}, err
+	}
 	if res.StatusCode >= 300 {
 		return Proposal{}, fmt.Errorf("reject proposal: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
@@ -738,39 +846,28 @@ type LogLine struct {
 
 // FollowLogs streams SSE log lines to w. names may be multiple; all=true uses gateway ?all=1.
 func (c *Client) FollowLogs(ctx context.Context, names []string, all bool, since, source, level string, w io.Writer) error {
-	u := c.Base + "/v1/logs?"
-	q := []string{}
+	path := "/v1/logs"
+	q := url.Values{"follow": {"1"}}
 	if all {
-		q = append(q, "all=1")
+		q.Set("all", "1")
 	}
-	for _, n := range names {
-		q = append(q, "name="+n)
+	for _, name := range names {
+		q.Add("name", name)
 	}
-	q = append(q, "follow=1")
 	if since != "" {
-		q = append(q, "since="+since)
+		q.Set("since", since)
 	}
 	if source != "" {
-		q = append(q, "source="+source)
+		q.Set("source", source)
 	}
 	if level != "" {
-		q = append(q, "level="+level)
+		q.Set("level", level)
 	}
-	u += strings.Join(q, "&")
-
-	// Single-name optimized path
 	if !all && len(names) == 1 {
-		u = c.Base + "/v1/sandboxes/" + names[0] + "/logs?follow=1"
-		if since != "" {
-			u += "&since=" + since
-		}
-		if source != "" {
-			u += "&source=" + source
-		}
-		if level != "" {
-			u += "&level=" + level
-		}
+		path = "/v1/sandboxes/" + url.PathEscape(names[0]) + "/logs"
+		q.Del("name")
 	}
+	u := c.Base + path + "?" + q.Encode()
 
 	httpClient := c.HTTP
 	if httpClient == nil {
@@ -791,15 +888,19 @@ func (c *Client) FollowLogs(ctx context.Context, names []string, all bool, since
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway follow logs: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	sc := bufio.NewScanner(res.Body)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for sc.Scan() {
 		line := sc.Text()
-		if strings.HasPrefix(line, "data: ") {
-			if _, err := fmt.Fprintln(w, strings.TrimPrefix(line, "data: ")); err != nil {
+		if after, ok := strings.CutPrefix(line, "data: "); ok {
+			if _, err := fmt.Fprintln(w, after); err != nil {
 				return err
 			}
 		}
@@ -809,18 +910,17 @@ func (c *Client) FollowLogs(ctx context.Context, names []string, all bool, since
 
 // GetLogsSnapshot returns recent log lines (non-follow JSON).
 func (c *Client) GetLogsSnapshot(ctx context.Context, name, since, source, level string) ([]LogLine, error) {
-	path := "/v1/sandboxes/" + name + "/logs?"
-	parts := []string{}
+	q := url.Values{}
 	if since != "" {
-		parts = append(parts, "since="+since)
+		q.Set("since", since)
 	}
 	if source != "" {
-		parts = append(parts, "source="+source)
+		q.Set("source", source)
 	}
 	if level != "" {
-		parts = append(parts, "level="+level)
+		q.Set("level", level)
 	}
-	path += strings.Join(parts, "&")
+	path := "/v1/sandboxes/" + url.PathEscape(name) + "/logs?" + q.Encode()
 	var out struct {
 		Lines []LogLine `json:"lines"`
 	}

@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	gc "github.com/whaleshell/whaleshell-sdk/internal/gatewayclient"
 )
@@ -43,12 +42,18 @@ func New(baseURL string) *Client {
 // NewWithToken returns a client with bearer auth.
 func NewWithToken(base, token string) *Client {
 	c := gc.NewWithToken(base, strings.TrimSpace(token))
-	c.HTTP.Timeout = 70 * time.Second // relay exec
+	c.HTTP.Timeout = gc.RelayTimeout
 	return &Client{Client: c}
 }
 
 // Stable type aliases (gateway HTTP payloads).
 type (
+	Labels                = gc.Labels
+	Credentials           = gc.Credentials
+	ProviderConfig        = gc.ProviderConfig
+	RefreshMaterial       = gc.RefreshMaterial
+	CredentialBindings    = gc.CredentialBindings
+	CredentialExpiry      = gc.CredentialExpiry
 	Sandbox               = gc.Sandbox
 	ExecResult            = gc.ExecResult
 	LogLine               = gc.LogLine
@@ -94,8 +99,6 @@ func (c *Client) Exec(ctx context.Context, name string, argv ...string) (ExecRes
 }
 
 // Connect is intentionally unsupported in the SDK.
-func (c *Client) Connect(ctx context.Context, name string) error {
-	_ = ctx
-	_ = name
+func (c *Client) Connect(_ context.Context, _ string) error {
 	return ErrConnectUnsupported
 }
