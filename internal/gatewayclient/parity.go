@@ -43,7 +43,11 @@ func (c *Client) PutInference(ctx context.Context, route InferenceRoute) (Infere
 		return InferenceRoute{}, err
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return InferenceRoute{}, err
+	}
 	if res.StatusCode >= 300 {
 		return InferenceRoute{}, fmt.Errorf("gateway put inference: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
@@ -67,7 +71,11 @@ func (c *Client) DeleteInference(ctx context.Context) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway delete inference: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -84,7 +92,11 @@ func (c *Client) Whoami(ctx context.Context) (map[string]any, error) {
 
 // PutSetting PUT /v1/settings/{key}.
 func (c *Client) PutSetting(ctx context.Context, key, value string) error {
-	b, _ := json.Marshal(map[string]string{"value": value})
+	b, err := json.Marshal(map[string]string{"value": value})
+	if err != nil {
+		err = fmt.Errorf("gateway encode request: %w", err)
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/settings/"+key, bytes.NewReader(b))
 	if err != nil {
 		return err
@@ -97,7 +109,11 @@ func (c *Client) PutSetting(ctx context.Context, key, value string) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway put setting: %s: %s", res.Status, bytes.TrimSpace(body))
 	}
 	return nil
@@ -146,7 +162,11 @@ func (c *Client) ConfigureProviderRefresh(ctx context.Context, name, key, strate
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		raw, _ := io.ReadAll(res.Body)
+		raw, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway refresh configure: %s: %s", res.Status, bytes.TrimSpace(raw))
 	}
 	return nil
@@ -165,7 +185,11 @@ func (c *Client) RotateProviderRefresh(ctx context.Context, name, key string) er
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		raw, _ := io.ReadAll(res.Body)
+		raw, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway refresh rotate: %s: %s", res.Status, bytes.TrimSpace(raw))
 	}
 	return nil
@@ -184,7 +208,11 @@ func (c *Client) DeleteProviderRefresh(ctx context.Context, name, key string) er
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		raw, _ := io.ReadAll(res.Body)
+		raw, err := io.ReadAll(res.Body)
+		if err != nil {
+			err = fmt.Errorf("gateway read response body: %w", err)
+			return err
+		}
 		return fmt.Errorf("gateway refresh delete: %s: %s", res.Status, bytes.TrimSpace(raw))
 	}
 	return nil

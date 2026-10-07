@@ -58,7 +58,11 @@ func (c *Client) do(ctx context.Context, method, path string, body any, want int
 		return err
 	}
 	defer res.Body.Close()
-	b, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	b, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	if err != nil {
+		err = fmt.Errorf("gateway read response body: %w", err)
+		return err
+	}
 	if res.StatusCode == http.StatusPreconditionFailed {
 		return fmt.Errorf("%w: %s", ErrSandboxNotReady, bytes.TrimSpace(b))
 	}
