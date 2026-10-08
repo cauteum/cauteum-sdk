@@ -4,6 +4,16 @@ go 1.27.0
 
 require (
 	github.com/NVIDIA/OpenShell/sdk/go v0.0.0-20260909233434-a0814443f19c
-	github.com/cauteum/cauteum-gateway v0.1.0-beta.1
+	github.com/cauteum/cauteum-gateway v0.1.0-beta.1.0.20261008214653-dd3919db019f
 	google.golang.org/grpc v1.84.0
+)
+
+require (
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 )
