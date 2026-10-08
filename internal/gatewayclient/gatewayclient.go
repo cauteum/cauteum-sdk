@@ -1,4 +1,4 @@
-// Package gatewayclient talks to whaleshell-gateway HTTP API.
+// Package gatewayclient talks to cauteum-gateway HTTP API.
 package gatewayclient
 
 import (
@@ -38,7 +38,7 @@ type CredentialBindings = map[string]string
 // CredentialExpiry maps credential keys to Unix millisecond expiration times.
 type CredentialExpiry = map[string]int64
 
-// Client is a tiny HTTP client for whaleshell-gateway.
+// Client is a tiny HTTP client for cauteum-gateway.
 type Client struct {
 	Base  string
 	Token string // optional Bearer
@@ -110,6 +110,7 @@ type Sandbox struct {
 	ID                string   `json:"id,omitempty"`
 	Image             string   `json:"image,omitempty"`
 	Workspace         string   `json:"workspace,omitempty"`
+	ResourceVersion   uint64   `json:"resource_version,omitempty"`
 	Network           string   `json:"network,omitempty"`
 	Status            string   `json:"status,omitempty"`
 	Labels            Labels   `json:"labels,omitempty"`
@@ -177,168 +178,13 @@ func (c *Client) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 	return out.Sandboxes, nil
 }
 
-// GetGlobalPolicy GET /v1/policy/global (YAML bytes).
-func (c *Client) GetGlobalPolicy(ctx context.Context) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+"/v1/policy/global", nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		err = fmt.Errorf("gateway read response body: %w", err)
-		return nil, err
-	}
-	if res.StatusCode >= 300 {
-		return nil, fmt.Errorf("gateway global policy: %s: %s", res.Status, bytes.TrimSpace(body))
-	}
-	return body, nil
-}
-
-// PutGlobalPolicy PUT /v1/policy/global with YAML body.
-func (c *Client) PutGlobalPolicy(ctx context.Context, yaml []byte) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/policy/global", bytes.NewReader(yaml))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/yaml")
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode >= 300 {
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			err = fmt.Errorf("gateway read response body: %w", err)
-			return err
-		}
-		return fmt.Errorf("gateway put global policy: %s: %s", res.Status, bytes.TrimSpace(body))
-	}
-	return nil
-}
-
 // ProfileInfo is a catalog entry summary.
 type ProfileInfo struct {
-	ID       string `json:"id"`
-	Category string `json:"category,omitempty"`
-	Source   string `json:"source"`
-	Scope    string `json:"scope,omitempty"`
-}
-
-// ListProfiles GET /v1/profiles.
-func (c *Client) ListProfiles(ctx context.Context) ([]ProfileInfo, error) {
-	return c.ListProfilesScoped(ctx, "global", "")
-}
-
-func (c *Client) ListProfilesScoped(ctx context.Context, scope, workspace string) ([]ProfileInfo, error) {
-	var out struct {
-		Profiles []ProfileInfo `json:"profiles"`
-	}
-	if err := c.get(ctx, profileScopePath("/v1/profiles", scope, workspace), &out); err != nil {
-		return nil, err
-	}
-	return out.Profiles, nil
-}
-
-// GetProfile fetches a profile from the selected gateway. JSON is valid YAML,
-// so returning the original JSON document also keeps the SDK schema-agnostic.
-func (c *Client) GetProfile(ctx context.Context, id string) ([]byte, string, string, error) {
-	return c.GetProfileScoped(ctx, id, "global", "")
-}
-
-func (c *Client) GetProfileScoped(ctx context.Context, id, scope, workspace string) ([]byte, string, string, error) {
-	path := profileScopePath("/v1/profiles/"+url.PathEscape(id), scope, workspace)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+path, nil)
-	if err != nil {
-		return nil, "", "", err
-	}
-	c.auth(req)
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return nil, "", "", err
-	}
-	defer res.Body.Close()
-	if res.StatusCode >= 300 {
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			err = fmt.Errorf("gateway read response body: %w", err)
-			return nil, "", "", err
-		}
-		return nil, "", "", fmt.Errorf("gateway get profile: %s: %s", res.Status, bytes.TrimSpace(body))
-	}
-	var out struct {
-		Profile json.RawMessage `json:"profile"`
-		Source  string          `json:"source"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
-		return nil, "", "", err
-	}
-	return out.Profile, out.Source, strings.Trim(res.Header.Get("ETag"), `"`), nil
-}
-
-// CreateProfile imports a profile without replacing an existing catalog entry.
-func (c *Client) CreateProfile(ctx context.Context, id string, profile []byte) error {
-	return c.CreateProfileScoped(ctx, id, profile, "global", "")
-}
-
-func (c *Client) CreateProfileScoped(ctx context.Context, id string, profile []byte, scope, workspace string) error {
-	return c.writeProfile(ctx, http.MethodPost, id, profile, "create", scope, workspace)
-}
-
-// PutProfile PUT /v1/profiles/{id} with YAML body.
-func (c *Client) PutProfile(ctx context.Context, id string, yaml []byte, expectedVersion string) error {
-	return c.PutProfileScoped(ctx, id, yaml, expectedVersion, "global", "")
-}
-
-func (c *Client) PutProfileScoped(ctx context.Context, id string, yaml []byte, expectedVersion, scope, workspace string) error {
-	if expectedVersion == "" {
-		return fmt.Errorf("gateway profile update: resource version required; read the profile first")
-	}
-	return c.writeProfile(ctx, http.MethodPut, id, yaml, "update", scope, workspace, expectedVersion)
-}
-
-func (c *Client) writeProfile(ctx context.Context, method, id string, profile []byte, operation, scope, workspace string, expectedVersion ...string) error {
-	path := profileScopePath("/v1/profiles/"+url.PathEscape(id), scope, workspace)
-	req, err := http.NewRequestWithContext(ctx, method, c.Base+path, bytes.NewReader(profile))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/yaml")
-	c.auth(req)
-	if len(expectedVersion) > 0 && expectedVersion[0] != "" {
-		req.Header.Set("If-Match", `"`+expectedVersion[0]+`"`)
-	}
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode >= 300 {
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			err = fmt.Errorf("gateway read response body: %w", err)
-			return err
-		}
-		return fmt.Errorf("gateway profile %s: %s: %s", operation, res.Status, bytes.TrimSpace(body))
-	}
-	return nil
-}
-
-func profileScopePath(path, scope, workspace string) string {
-	values := url.Values{}
-	if scope == "" {
-		scope = "global"
-	}
-	values.Set("scope", scope)
-	if workspace != "" {
-		values.Set("workspace", workspace)
-	}
-	return path + "?" + values.Encode()
+	ID              string `json:"id"`
+	Category        string `json:"category,omitempty"`
+	Source          string `json:"source"`
+	Scope           string `json:"scope,omitempty"`
+	ResourceVersion uint64 `json:"resource_version,omitempty"`
 }
 
 // ProviderRecord is a gateway provider instance (env key names only on GET).
@@ -437,34 +283,6 @@ func (c *Client) DeleteProvider(ctx context.Context, name string) error {
 	return nil
 }
 
-// DeleteProfile DELETE /v1/profiles/{id}.
-func (c *Client) DeleteProfile(ctx context.Context, id string) error {
-	return c.DeleteProfileScoped(ctx, id, "global", "")
-}
-
-func (c *Client) DeleteProfileScoped(ctx context.Context, id, scope, workspace string) error {
-	path := profileScopePath("/v1/profiles/"+url.PathEscape(id), scope, workspace)
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+path, nil)
-	if err != nil {
-		return err
-	}
-	c.auth(req)
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode >= 300 {
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			err = fmt.Errorf("gateway read response body: %w", err)
-			return err
-		}
-		return fmt.Errorf("gateway delete profile: %s: %s", res.Status, bytes.TrimSpace(body))
-	}
-	return nil
-}
-
 // AttachProvider PUT /v1/sandboxes/{sandbox}/providers/{provider}.
 func (c *Client) AttachProvider(ctx context.Context, sandbox, provider string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/providers/"+url.PathEscape(provider), nil)
@@ -509,132 +327,12 @@ func (c *Client) DetachProvider(ctx context.Context, sandbox, provider string) e
 	return nil
 }
 
-// EffectivePolicy GET /v1/sandboxes/{name}/effective-policy (YAML).
-func (c *Client) EffectivePolicy(ctx context.Context, sandbox string) ([]byte, error) {
-	return c.GetSandboxPolicy(ctx, sandbox, "full")
-}
-
-// GetSandboxPolicy GET /v1/sandboxes/{name}/policy?view=base|full (YAML).
-// view "base" is the editable sandbox layer; "full" is Compose(base, providers).
-func (c *Client) GetSandboxPolicy(ctx context.Context, sandbox, view string) ([]byte, error) {
-	view = strings.ToLower(strings.TrimSpace(view))
-	switch view {
-	case "", "full", "effective":
-		view = "full"
-	case "base":
-		// ok
-	default:
-		return nil, fmt.Errorf("policy view must be base or full")
-	}
-	u := c.Base + "/v1/sandboxes/" + url.PathEscape(sandbox) + "/policy?view=" + view
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		err = fmt.Errorf("gateway read response body: %w", err)
-		return nil, err
-	}
-	if res.StatusCode >= 300 {
-		// Older gateways only expose effective-policy.
-		if view == "full" {
-			req2, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/effective-policy", nil)
-			if err != nil {
-				return nil, err
-			}
-			res2, err := c.HTTP.Do(req2)
-			if err != nil {
-				return nil, err
-			}
-			defer res2.Body.Close()
-			body2, err := io.ReadAll(res2.Body)
-			if err != nil {
-				err = fmt.Errorf("gateway read response body: %w", err)
-				return nil, err
-			}
-			if res2.StatusCode >= 300 {
-				return nil, fmt.Errorf("gateway policy get: %s: %s", res.Status, bytes.TrimSpace(body))
-			}
-			return body2, nil
-		}
-		return nil, fmt.Errorf("gateway policy get: %s: %s", res.Status, bytes.TrimSpace(body))
-	}
-	return body, nil
-}
-
-// PutSandboxPolicy PUT /v1/sandboxes/{name}/policy — stores base YAML, returns effective YAML.
-// OpenShell-style: providers stay attached; gateway re-composes before accepting.
-func (c *Client) PutSandboxPolicy(ctx context.Context, sandbox string, baseYAML []byte) (effective []byte, stripped int, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/sandboxes/"+url.PathEscape(sandbox)+"/policy", bytes.NewReader(baseYAML))
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Content-Type", "application/yaml")
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		err = fmt.Errorf("gateway read response body: %w", err)
-		return nil, 0, err
-	}
-	if res.StatusCode >= 300 {
-		return nil, 0, fmt.Errorf("gateway policy set: %s: %s", res.Status, bytes.TrimSpace(body))
-	}
-	if v := res.Header.Get("X-Whaleshell-Stripped-Provider-Rules"); v != "" {
-		_, _ = fmt.Sscanf(v, "%d", &stripped)
-	}
-	return body, stripped, nil
-}
-
 // PolicyRevisionMeta is metadata for policy list (no YAML body).
 type PolicyRevisionMeta struct {
 	Rev       int       `json:"rev"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Bytes     int       `json:"bytes"`
 	Status    string    `json:"status"`
-}
-
-// ListPolicyRevisions GET /v1/sandboxes/{name}/policy-revisions.
-func (c *Client) ListPolicyRevisions(ctx context.Context, sandbox string) ([]PolicyRevisionMeta, error) {
-	var out struct {
-		Revisions []PolicyRevisionMeta `json:"revisions"`
-	}
-	if err := c.get(ctx, "/v1/sandboxes/"+url.PathEscape(sandbox)+"/policy-revisions", &out); err != nil {
-		return nil, err
-	}
-	return out.Revisions, nil
-}
-
-// GetPolicyRevision GET /v1/sandboxes/{name}/policy-revisions?rev=N (YAML body).
-func (c *Client) GetPolicyRevision(ctx context.Context, sandbox string, rev int) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		fmt.Sprintf("%s/v1/sandboxes/%s/policy-revisions?rev=%d", c.Base, url.PathEscape(sandbox), rev), nil)
-	if err != nil {
-		return "", err
-	}
-	res, err := c.HTTP.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		err = fmt.Errorf("gateway read response body: %w", err)
-		return "", err
-	}
-	if res.StatusCode >= 300 {
-		return "", fmt.Errorf("gateway policy rev: %s: %s", res.Status, bytes.TrimSpace(body))
-	}
-	return string(body), nil
 }
 
 // SandboxProviderAttachment is metadata for sandbox provider list.

@@ -15,7 +15,7 @@ type ExecResult struct {
 // GetSandbox GET /v1/sandboxes/{name}.
 func (c *Client) GetSandbox(ctx context.Context, name string) (Sandbox, error) {
 	var sb Sandbox
-	if err := c.get(ctx, "/v1/sandboxes/"+name, &sb); err != nil {
+	if err := c.get(ctx, "/v1/sandboxes/"+url.PathEscape(name), &sb); err != nil {
 		return Sandbox{}, err
 	}
 	return sb, nil

@@ -1,40 +1,40 @@
-<h1 align="center">whaleshell-sdk</h1>
+<h1 align="center">cauteum-sdk</h1>
 
 <p align="center">
-  <strong>Go client for whaleshell-gateway</strong><br>
-  Thin HTTP client (`go/whaleshell`) — no fat runtime dependency.
+  <strong>Go client for cauteum-gateway</strong><br>
+  generated gRPC resources and the versioned Cauteum control API.
 </p>
 <p align="center">
-  <a href="https://github.com/whaleshell/whaleshell-sdk/actions/workflows/ci.yml"><img src="https://github.com/whaleshell/whaleshell-sdk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://pkg.go.dev/github.com/whaleshell/whaleshell-sdk"><img src="https://pkg.go.dev/badge/github.com/whaleshell/whaleshell-sdk.svg" alt="Go Reference"></a>
+  <a href="https://github.com/cauteum/cauteum-sdk/actions/workflows/ci.yml"><img src="https://github.com/cauteum/cauteum-sdk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pkg.go.dev/github.com/cauteum/cauteum-sdk"><img src="https://pkg.go.dev/badge/github.com/cauteum/cauteum-sdk.svg" alt="Go Reference"></a>
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/whaleshell/whaleshell-sdk"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
+  <a href="https://github.com/cauteum/cauteum-sdk"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
 <p align="center">
-  <sub>Part of the <a href="https://github.com/whaleshell">whaleshell / whaleshell</a> ecosystem</sub>
+  <sub>Part of the <a href="https://github.com/cauteum">cauteum / cauteum</a> ecosystem</sub>
 </p>
 
 ---
 
 ## Overview
 
-The [gateway guide](https://whaleshell.github.io/guides/gateway/) describes the service this client calls. [OpenShell compatibility](https://whaleshell.github.io/reference/openshell-compatibility/) is tracked separately from this SDK's HTTP API.
+The [gateway guide](https://cauteum.github.io/guides/gateway/) describes the service this client calls. [OpenShell compatibility](https://cauteum.github.io/reference/openshell-compatibility/) is tracked separately from this SDK's HTTP API.
 
-**whaleshell-sdk** talks to [whaleshell-gateway](https://github.com/whaleshell/whaleshell-gateway) over HTTP: create/list/delete sandboxes, relay exec, logs, and policy proposals. Interactive TTY stays on the CLI (`whaleshell connect`).
+**cauteum-sdk** talks to [cauteum-gateway](https://github.com/cauteum/cauteum-gateway) through typed RPC clients. Sandbox inventory, detail, lifecycle, logs, provider profiles, partial provider credential updates, policy workflows, and service/template listings use generated native gRPC clients for `cauteum.control.v1`; command execution, provider instances/attachments/refresh, workspace resources, and SSH session issue/revoke use the pinned OpenShell Go SDK. Settings, service/template details and writes, supervisor registration, and some other Cauteum-only workflows still use REST routes and are being migrated. Interactive byte streams stay on the CLI (`cauteum connect`). REST compatibility is not a migration requirement.
 
 ### Key Features
 
 | Category | Capabilities |
 |----------|--------------|
-| **Client** | `go/whaleshell` — public SDK (wraps internal gateway HTTP client) |
-| **Relay** | Long-poll exec against `whaleshell-agent` |
+| **Client** | `go/cauteum` — resource facade over generated RPC clients; some legacy HTTP methods remain during migration |
+| **Execution** | OpenShell `ExecSandbox` RPC; interactive TTY stays on the CLI |
 | **Proposals** | List / get / approve / reject |
 
 ---
 
 ## Installation
 
-For source development, use the sibling `go.work` workspace and run `go test ./...` here. A clean consumer build from published tags is still a [release blocker](https://whaleshell.github.io/reference/openshell-compatibility/).
+For source development, use the sibling `go.work` workspace and run `go test ./...` here. The control client depends on the gateway's generated Go contract package. Publish the gateway beta containing that package before publishing the matching SDK beta.
 
 **Requirements:** Go 1.27+
 
@@ -49,12 +49,12 @@ import (
     "context"
     "fmt"
 
-    "github.com/whaleshell/whaleshell-sdk/go/whaleshell"
+    "github.com/cauteum/cauteum-sdk/go/cauteum"
 )
 
 func main() {
-    c := whaleshell.New("http://127.0.0.1:7443")
-    list, err := c.List(context.Background())
+    c := cauteum.New("http://127.0.0.1:7443")
+    list, err := c.ListControlSandboxes(context.Background(), "default", false)
     if err != nil {
         panic(err)
     }
@@ -68,8 +68,16 @@ func main() {
 
 | Path | Purpose |
 |------|---------|
-| `go/whaleshell` | Public Go SDK |
+| `go/cauteum` | Public Go SDK |
 | `internal/gatewayclient/` | HTTP API implementation (not importable outside the module) |
+
+`ListControlSandboxes(ctx, workspace, allWorkspaces)`, `GetControlSandbox`,
+`GetControlSandboxLogs`, and `WatchControlSandboxLogs` use
+`cauteum.control.v1` over native gRPC. `Whoami(ctx)` uses `GetViewer`. `List(ctx)` uses the control API across all workspaces
+visible to the caller, and `Get(ctx, name)` selects the default workspace. The
+`Exec(ctx, name, argv...)` method uses the pinned OpenShell Go SDK. The CLI uses native gRPC for `sandbox list/get`, filtered log snapshots, and a single
+sandbox's live log stream. `logs --all` enumerates caller-visible workspaces and
+uses bounded concurrent gRPC streams (up to 24 sandboxes per invocation).
 
 
 ---
@@ -79,10 +87,10 @@ func main() {
 | Resource | Link |
 |----------|------|
 | Roadmap | [ROADMAP.md](./ROADMAP.md) |
-| Organization | [https://github.com/whaleshell](https://github.com/whaleshell) |
-| Organization overview | [github.com/whaleshell](https://github.com/whaleshell) |
-| pkg.go.dev | [`github.com/whaleshell/whaleshell-sdk`](https://pkg.go.dev/github.com/whaleshell/whaleshell-sdk) |
+| Organization | [https://github.com/cauteum](https://github.com/cauteum) |
+| Organization overview | [github.com/cauteum](https://github.com/cauteum) |
+| pkg.go.dev | [`github.com/cauteum/cauteum-sdk`](https://pkg.go.dev/github.com/cauteum/cauteum-sdk) |
 
 ## License
 
-[Apache-2.0](./LICENSE) © whaleshell
+[Apache-2.0](./LICENSE) © cauteum

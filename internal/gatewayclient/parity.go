@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 // InferenceRoute is GET/PUT /v1/inference.
@@ -97,7 +98,7 @@ func (c *Client) PutSetting(ctx context.Context, key, value string) error {
 		err = fmt.Errorf("gateway encode request: %w", err)
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/settings/"+key, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/settings/"+url.PathEscape(key), bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -124,7 +125,7 @@ func (c *Client) GetSetting(ctx context.Context, key string) (string, error) {
 	var out struct {
 		Value string `json:"value"`
 	}
-	if err := c.get(ctx, "/v1/settings/"+key, &out); err != nil {
+	if err := c.get(ctx, "/v1/settings/"+url.PathEscape(key), &out); err != nil {
 		return "", err
 	}
 	return out.Value, nil
@@ -149,8 +150,11 @@ func (c *Client) ConfigureProviderRefresh(ctx context.Context, name, key, strate
 		"material":       material,
 		"expires_at_ms":  expiresAtMS,
 	}
-	b, _ := json.Marshal(body)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/providers/"+name+"/refresh/"+key, bytes.NewReader(b))
+	b, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("gateway encode refresh configuration: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Base+"/v1/providers/"+url.PathEscape(name)+"/refresh/"+url.PathEscape(key), bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -174,7 +178,7 @@ func (c *Client) ConfigureProviderRefresh(ctx context.Context, name, key, strate
 
 // RotateProviderRefresh POST /v1/providers/{name}/refresh/{key}/rotate.
 func (c *Client) RotateProviderRefresh(ctx context.Context, name, key string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/v1/providers/"+name+"/refresh/"+key+"/rotate", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Base+"/v1/providers/"+url.PathEscape(name)+"/refresh/"+url.PathEscape(key)+"/rotate", nil)
 	if err != nil {
 		return err
 	}
@@ -197,7 +201,7 @@ func (c *Client) RotateProviderRefresh(ctx context.Context, name, key string) er
 
 // DeleteProviderRefresh DELETE /v1/providers/{name}/refresh/{key}.
 func (c *Client) DeleteProviderRefresh(ctx context.Context, name, key string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/providers/"+name+"/refresh/"+key, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.Base+"/v1/providers/"+url.PathEscape(name)+"/refresh/"+url.PathEscape(key), nil)
 	if err != nil {
 		return err
 	}
