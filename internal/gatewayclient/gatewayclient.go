@@ -95,15 +95,6 @@ func (c *Client) Healthz(ctx context.Context) (map[string]any, error) {
 	return out, nil
 }
 
-// Info hits /v1/info.
-func (c *Client) Info(ctx context.Context) (map[string]any, error) {
-	var out map[string]any
-	if err := c.get(ctx, "/v1/info", &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // Sandbox is the registry payload.
 type Sandbox struct {
 	Name              string   `json:"name"`
