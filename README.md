@@ -18,7 +18,7 @@
 
 ## Overview
 
-The [gateway guide](https://cauteum.github.io/guides/gateway/) describes the service this client calls. [OpenShell compatibility](https://cauteum.github.io/reference/openshell-compatibility/) is tracked separately from this SDK's HTTP API.
+The [gateway guide](https://cauteum-haven.github.io/guides/gateway/) describes the service this client calls. [OpenShell compatibility](https://cauteum-haven.github.io/reference/openshell-compatibility/) is tracked separately from this SDK's HTTP API.
 
 **cauteum-sdk** talks to [cauteum-gateway](https://github.com/cauteum-haven/cauteum-gateway) through typed RPC clients. Sandbox inventory, detail, lifecycle, logs, provider profiles, partial provider credential updates, policy workflows, and service/template listings use generated native gRPC clients for `cauteum.control.v1`; command execution, provider instances/attachments/refresh, workspace resources, and SSH session issue/revoke use the pinned OpenShell Go SDK. Settings, service/template details and writes, supervisor registration, and some other Cauteum-only workflows still use REST routes and are being migrated. Interactive byte streams stay on the CLI (`cauteum connect`). REST compatibility is not a migration requirement.
 
