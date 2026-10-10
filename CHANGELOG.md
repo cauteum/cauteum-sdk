@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [v0.1.0-beta.1] - 2026-10-10
+
+### Added
+
+- Provide typed Go clients for Control RPC gateway information, inference, sandbox and log management, services, settings and secrets.
+- Carry request IDs, resource versions and operation recovery through the management client.
+
 ## [v0.1.0-alpha.2] - 2026-10-07
 
 ### Added
