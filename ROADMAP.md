@@ -1,6 +1,6 @@
 # Roadmap — cauteum-sdk
 
-Status: **v0.1.0-alpha.2** (alpha) · Talks to [cauteum-gateway](https://github.com/cauteum/cauteum-gateway)
+Status: **v0.1.0-alpha.2** (alpha) · Talks to [cauteum-gateway](https://github.com/cauteum-haven/cauteum-gateway)
 
 ## This module
 

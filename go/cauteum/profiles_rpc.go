@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	controlv1 "github.com/cauteum/cauteum-gateway/api/gen/cauteum/control/v1"
-	gc "github.com/cauteum/cauteum-sdk/internal/gatewayclient"
+	controlv1 "github.com/cauteum-haven/cauteum-gateway/api/gen/cauteum/control/v1"
+	gc "github.com/cauteum-haven/cauteum-sdk/internal/gatewayclient"
 )
 
 // ListProfiles and its scoped form use the curated Cauteum control API.

@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
-	gc "github.com/cauteum/cauteum-sdk/internal/gatewayclient"
+	gc "github.com/cauteum-haven/cauteum-sdk/internal/gatewayclient"
 	"google.golang.org/grpc"
 )
 
