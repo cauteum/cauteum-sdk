@@ -35,7 +35,7 @@ jobs:
         with:
           repository: cauteum-haven/cauteum-gateway
           path: cauteum-gateway
-          ref: 2934e36dc4b5e397f4485d88f5135c69e6462a33
+          ref: efd49bfc3ea6f3cd4cba8d450f97b2572b40da53
 
       - name: Configure Go workspace
         shell: bash
@@ -80,7 +80,7 @@ jobs:
         with:
           repository: cauteum-haven/cauteum-gateway
           path: cauteum-gateway
-          ref: 2934e36dc4b5e397f4485d88f5135c69e6462a33
+          ref: efd49bfc3ea6f3cd4cba8d450f97b2572b40da53
 
       - name: Configure Go workspace
         shell: bash
@@ -125,7 +125,7 @@ jobs:
         with:
           repository: cauteum-haven/cauteum-gateway
           path: cauteum-gateway
-          ref: 2934e36dc4b5e397f4485d88f5135c69e6462a33
+          ref: efd49bfc3ea6f3cd4cba8d450f97b2572b40da53
 
       - name: Configure Go workspace
         shell: bash
@@ -168,7 +168,7 @@ jobs:
         with:
           repository: cauteum-haven/cauteum-gateway
           path: cauteum-gateway
-          ref: 2934e36dc4b5e397f4485d88f5135c69e6462a33
+          ref: efd49bfc3ea6f3cd4cba8d450f97b2572b40da53
 
       - name: Configure Go workspace
         shell: bash
