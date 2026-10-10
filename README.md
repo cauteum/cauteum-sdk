@@ -5,22 +5,22 @@
   generated gRPC resources and the versioned Cauteum control API.
 </p>
 <p align="center">
-  <a href="https://github.com/cauteum-haven/cauteum-sdk/actions/workflows/ci.yml"><img src="https://github.com/cauteum-haven/cauteum-sdk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://pkg.go.dev/github.com/cauteum-haven/cauteum-sdk"><img src="https://pkg.go.dev/badge/github.com/cauteum-haven/cauteum-sdk.svg" alt="Go Reference"></a>
+  <a href="https://github.com/cautem/cauteum-sdk/actions/workflows/ci.yml"><img src="https://github.com/cautem/cauteum-sdk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pkg.go.dev/github.com/cautem/cauteum-sdk"><img src="https://pkg.go.dev/badge/github.com/cautem/cauteum-sdk.svg" alt="Go Reference"></a>
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/cauteum-haven/cauteum-sdk"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
+  <a href="https://github.com/cautem/cauteum-sdk"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
 <p align="center">
-  <sub>Part of the <a href="https://github.com/cauteum-haven">cauteum / cauteum</a> ecosystem</sub>
+  <sub>Part of the <a href="https://github.com/cautem">cauteum / cauteum</a> ecosystem</sub>
 </p>
 
 ---
 
 ## Overview
 
-The [gateway guide](https://cauteum-haven.github.io/guides/gateway/) describes the service this client calls. [OpenShell compatibility](https://cauteum-haven.github.io/reference/openshell-compatibility/) is tracked separately from this SDK's HTTP API.
+The [gateway guide](https://cautem.github.io/cauteum-haven.github.io/guides/gateway/) describes the service this client calls. [OpenShell compatibility](https://cautem.github.io/cauteum-haven.github.io/reference/openshell-compatibility/) is tracked separately from this SDK's HTTP API.
 
-**cauteum-sdk** talks to [cauteum-gateway](https://github.com/cauteum-haven/cauteum-gateway) through typed RPC clients. Sandbox inventory, detail, lifecycle, logs, provider profiles, partial provider credential updates, policy workflows, and service/template listings use generated native gRPC clients for `cauteum.control.v1`; command execution, provider instances/attachments/refresh, workspace resources, and SSH session issue/revoke use the pinned OpenShell Go SDK. Settings, service/template details and writes, supervisor registration, and some other Cauteum-only workflows still use REST routes and are being migrated. Interactive byte streams stay on the CLI (`cauteum connect`). REST compatibility is not a migration requirement.
+**cauteum-sdk** talks to [cauteum-gateway](https://github.com/cautem/cauteum-gateway) through typed RPC clients. Sandbox inventory, detail, lifecycle, logs, provider profiles, partial provider credential updates, policy workflows, and service/template listings use generated native gRPC clients for `cauteum.control.v1`; command execution, provider instances/attachments/refresh, workspace resources, and SSH session issue/revoke use the pinned OpenShell Go SDK. Settings, service/template details and writes, supervisor registration, and some other Cauteum-only workflows still use REST routes and are being migrated. Interactive byte streams stay on the CLI (`cauteum connect`). REST compatibility is not a migration requirement.
 
 ### Key Features
 
@@ -49,7 +49,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/cauteum-haven/cauteum-sdk/go/cauteum"
+    "github.com/cautem/cauteum-sdk/go/cauteum"
 )
 
 func main() {
@@ -87,9 +87,9 @@ uses bounded concurrent gRPC streams (up to 24 sandboxes per invocation).
 | Resource | Link |
 |----------|------|
 | Roadmap | [ROADMAP.md](./ROADMAP.md) |
-| Organization | [https://github.com/cauteum](https://github.com/cauteum-haven) |
-| Organization overview | [github.com/cauteum](https://github.com/cauteum-haven) |
-| pkg.go.dev | [`github.com/cauteum-haven/cauteum-sdk`](https://pkg.go.dev/github.com/cauteum-haven/cauteum-sdk) |
+| Organization | [https://github.com/cautem](https://github.com/cautem) |
+| Organization overview | [github.com/cautem](https://github.com/cautem) |
+| pkg.go.dev | [`github.com/cautem/cauteum-sdk`](https://pkg.go.dev/github.com/cautem/cauteum-sdk) |
 
 ## License
 

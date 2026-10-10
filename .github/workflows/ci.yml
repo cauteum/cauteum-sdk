@@ -33,7 +33,7 @@ jobs:
       - name: Checkout Control API dependency
         uses: actions/checkout@v4
         with:
-          repository: cauteum-haven/cauteum-gateway
+          repository: cautem/cauteum-gateway
           path: cauteum-gateway
           ref: 2ca30c16d36aa589c0557f7929ce952922025c45
 
@@ -78,7 +78,7 @@ jobs:
       - name: Checkout Control API dependency
         uses: actions/checkout@v4
         with:
-          repository: cauteum-haven/cauteum-gateway
+          repository: cautem/cauteum-gateway
           path: cauteum-gateway
           ref: 2ca30c16d36aa589c0557f7929ce952922025c45
 
@@ -123,7 +123,7 @@ jobs:
       - name: Checkout Control API dependency
         uses: actions/checkout@v4
         with:
-          repository: cauteum-haven/cauteum-gateway
+          repository: cautem/cauteum-gateway
           path: cauteum-gateway
           ref: 2ca30c16d36aa589c0557f7929ce952922025c45
 
@@ -166,7 +166,7 @@ jobs:
       - name: Checkout Control API dependency
         uses: actions/checkout@v4
         with:
-          repository: cauteum-haven/cauteum-gateway
+          repository: cautem/cauteum-gateway
           path: cauteum-gateway
           ref: 2ca30c16d36aa589c0557f7929ce952922025c45
 

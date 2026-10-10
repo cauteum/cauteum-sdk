@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cauteum-haven/cauteum-sdk/go/cauteum"
+	"github.com/cautem/cauteum-sdk/go/cauteum"
 )
 
 func TestHealthBootstrapRemainsHTTP(t *testing.T) {

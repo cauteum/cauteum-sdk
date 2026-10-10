@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	controlv1 "github.com/cauteum-haven/cauteum-gateway/api/gen/cauteum/control/v1"
-	gc "github.com/cauteum-haven/cauteum-sdk/internal/gatewayclient"
+	controlv1 "github.com/cautem/cauteum-gateway/api/gen/cauteum/control/v1"
+	gc "github.com/cautem/cauteum-sdk/internal/gatewayclient"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

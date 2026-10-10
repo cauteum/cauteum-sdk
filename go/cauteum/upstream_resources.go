@@ -11,7 +11,7 @@ import (
 
 	openshell "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1"
 	opentypes "github.com/NVIDIA/OpenShell/sdk/go/openshell/v1/types"
-	gc "github.com/cauteum-haven/cauteum-sdk/internal/gatewayclient"
+	gc "github.com/cautem/cauteum-sdk/internal/gatewayclient"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
